@@ -1,4 +1,4 @@
-## BlastGate
+## Cust Collector Blast Gate
 
 BlastGate is a Arduino/PlatformIO project that controls a stepper-driven gate intended for an airflow shutter of a dust collection system. A homing routine moves the gate to the closed position at start up using a physical limit switch. The open position and move speed can be teached in with a calibration and speed adjustment routine.
 
@@ -18,25 +18,25 @@ BlastGate is a Arduino/PlatformIO project that controls a stepper-driven gate in
 - A status LED on a digital pin.
 
 ### Pins
-- stepPin — step signal for stepper driver
-- dirPin — direction signal for stepper driver
-- limitPin — limit switch (HIGH active)
-- inputPin — analog command input (ADC)
-- buttonPin — push button (LOW active)
-- ledPin — status LED
+- stepPin   - step signal for stepper driver
+- dirPin    - direction signal for stepper driver
+- limitPin  - limit switch (HIGH active)
+- inputPin  - analog command input (ADC)
+- buttonPin - push button (LOW active)
+- ledPin    - status LED
 
 ### Voltage Divider & ADC reference
 - The analog input measures the supply voltage (e.g.: 12 V => gate closed, 14 V => gate open).
   The MCU ADC is configured to use the internal 1.1 V reference, so the divider must scale the measured voltage to be within 0..1.1 V.
 - Formula: Vout = Vin * (R2 / (R1 + R2)). ADC reading = Vout / Vref * 1023 (here Vref = 1.1 V).
 - Example divider: R1 = 120 kΩ, R2 = 10 kΩ:
-    - 12 V -> Vout ≈ 0,9230 V -> ADC ≈ 859
-    - 13 V -> Vout ≈ 1.0000 V -> ADC ≈ 930
-    - 14 V -> Vout = 1,0769 V -> ADC ≈ 1002
+    - 12 V -> Vout = 0,9230 V -> ADC = 859
+    - 13 V -> Vout = 1.0000 V -> ADC = 930
+    - 14 V -> Vout = 1,0769 V -> ADC = 1002
 - Example divider: R1 = 220 kΩ, R2 = 12 kΩ:
-    - 17 V -> Vout ≈ 0,8793 V -> ADC ≈ 818
-    - 18 V -> Vout ≈ 0,9310 V -> ADC ≈ 866
-    - 19 V -> Vout = 0,9827 V -> ADC ≈ 914
+    - 17 V -> Vout = 0,8793 V -> ADC = 818
+    - 18 V -> Vout = 0,9310 V -> ADC = 866
+    - 19 V -> Vout = 0,9827 V -> ADC = 914
 
 - Threshold and hysteresis must be configured  to `CMD_INPUT_THRESHOLD` and `CMD_INPUT_HYSTERESIS`.
 

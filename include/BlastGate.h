@@ -56,14 +56,19 @@ private:
     uint8_t inputPin;
     uint8_t buttonPin;
     Debounce<uint8_t, 10> deb = Debounce<uint8_t>(0, CMD_BUTTON);
-    ConstThresholdDetector<uint16_t, CMD_INPUT_THRESHOLD, CMD_INPUT_HYSTERESIS> thd;
+    ThresholdDetector<uint16_t> thd = ThresholdDetector<uint16_t>(CMD_INPUT_THRESHOLD, 
+                                                                 CMD_INPUT_HYSTERESIS);
 
-    int32_t openPos = 0;
-    int32_t closedPos = 0;  // default closed position, e.g. zero position
+    int32_t posOpen = 0;
+    int32_t posClosed = 0;  // default closed position, e.g. zero position
     int32_t moveSpeed = SPEED_MIN;
     int32_t moveAcceleration = SPEED_MIN*2;
     bool speedDirUp = true;
     int8_t inputState = -1; // -1 = unknown, 0 = closed, 1 = open
+    int16_t inputThreshold = CMD_INPUT_THRESHOLD;
+    int16_t inputHysteresis = CMD_INPUT_HYSTERESIS;
+    uint16_t adcOpen = 0;
+    uint16_t adcClosed = 0;
 
     // states
     enum GateState : uint8_t {
@@ -75,7 +80,7 @@ private:
         STATE_CALIBRATION_START,
         STATE_CALIBRATION_MOVE_TO_LIMIT,
         STATE_CALIBRATION_WAIT_TO_START,
-        STATE_CALIBRATION_WAIT_RELEASE,
+        STATE_CALIBRATION_MOVE_TO_OPEN,
         STATE_CALIBRATION_DONE,
         STATE_SPEED_ADJUSTMENT,
         STATE_ERROR
@@ -86,8 +91,10 @@ private:
     uint32_t startTime = 0;
 
     // eeprom layout
-    static constexpr uint16_t EEPROM_ADDR_SPEED   = 0;
-    static constexpr uint16_t EEPROM_ADDR_OPENPOS = 10;
+    static constexpr uint16_t EEPROM_ADDR_INPUT_TH = 0;
+    static constexpr uint16_t EEPROM_ADDR_INPUT_HYST = 4;
+    static constexpr uint16_t EEPROM_ADDR_SPEED   = 8;
+    static constexpr uint16_t EEPROM_ADDR_POS_OPEN = 12;
 
     bool readSettings();
     void writeSettings();
@@ -115,4 +122,7 @@ private:
     inline bool buttonPressedShort() { return deb.getKeyShort(CMD_BUTTON); }
     inline bool buttonPressedLong() { return deb.getKeyLong(CMD_BUTTON); }
 
+    inline bool isNear(uint16_t a, uint16_t b, uint16_t threshold) {
+    return (abs((int32_t)a - (int32_t)b) <= threshold);
+    }
 };

@@ -14,8 +14,8 @@ BlastGate::BlastGate(uint8_t stepPin, uint8_t dirPin, uint8_t limitPin,
 
 void BlastGate::begin() {
     Serial << magenta << F("BlastGate v");
-    Serial << magenta << BG_VERSION_MAJOR << "." << BG_VERSION_MINOR << "." << BG_VERSION_SUB;
-    Serial << magenta << " (" <<  __TIMESTAMP__  << ")" << DI::endl;
+    Serial << magenta << BG_VERSION_MAJOR << F(".") << BG_VERSION_MINOR << F(".") << BG_VERSION_SUB;
+    Serial << magenta << F(" (") <<  __TIMESTAMP__  << F(")") << DI::endl;
 
     pinMode(inputPin, INPUT);
     analogReference(INTERNAL); // use internal 1.1V reference for analog input
@@ -26,11 +26,11 @@ void BlastGate::begin() {
     delay(200);  // button debounce must have detect valid state before proceeding
     bool startCalib = !readSettings();
     if (getButtonState()) {
-        Serial << beginl << yellow << "Button pressed, starting calibration..." << DI::endl;
+        Serial << beginl << yellow << F("Button pressed, starting calibration...") << DI::endl;
         startCalib = true;
     }
     if (startCalib) {
-        Serial << beginl << yellow << "Release button to start..." << DI::endl;
+        Serial << beginl << yellow << F("Release button to start...") << DI::endl;
         while (getButtonState());  // wait for button release
         buttonPressedShort();  // clear button state
         buttonPressedLong();
@@ -42,28 +42,56 @@ void BlastGate::begin() {
 
 // ---------------- EEPROM ----------------
 bool BlastGate::readSettings() {
+    int32_t inputTh = 0;
+    EEPROM.get(EEPROM_ADDR_INPUT_TH, inputTh);
+    if (inputTh < 0 || inputTh > 1020) {
+    Serial << beginl << blue << F("EEPROM invalid, using default input threshold") << DI::endl;
+        inputThreshold = CMD_INPUT_THRESHOLD;
+    } else {
+        inputThreshold = inputTh;
+    }
+    int32_t inputHyst = 0;
+    EEPROM.get(EEPROM_ADDR_INPUT_HYST, inputHyst);
+    if (inputHyst < 0 || inputHyst > 300) {
+        Serial << beginl << blue << F("EEPROM invalid, using default input hysteresis") << DI::endl;
+        inputHysteresis = CMD_INPUT_HYSTERESIS;
+    } else {
+        inputHysteresis = inputHyst;
+    }
+    thd.setLimit(inputThreshold);
+    thd.setHysteresis(inputHysteresis);
     int32_t speed = 0;
     EEPROM.get(EEPROM_ADDR_SPEED, speed);
     if (speed < SPEED_MIN || speed > SPEED_MAX) {
-        Serial << beginl << blue << "EEPROM invalid, using default speed" << DI::endl;
+        Serial << beginl << blue << F("EEPROM invalid, using default speed") << DI::endl;
         speed = SPEED_MIN;
     }
     setSpeed(speed);
     int32_t pos = 0;
-    EEPROM.get(EEPROM_ADDR_OPENPOS, pos);
+    EEPROM.get(EEPROM_ADDR_POS_OPEN, pos);
     if (pos <= 0 || pos > POSITION_MAX) {
-        Serial << beginl << red << "EEPROM invalid, force openPos calibration" << DI::endl;
+        Serial << beginl << red << F("EEPROM invalid, force calibration") << DI::endl;
         return false;
     }
-    openPos = pos;
-    Serial << beginl << "Read EEPROM: speed=" << moveSpeed << ", openPos=" << openPos << DI::endl;
+    posOpen = pos;
+    Serial << beginl << F("Read EEPROM: inputTh=") << inputThreshold
+           << F(", inputHyst=") << inputHysteresis
+           << F(", speed=") << moveSpeed
+           << F(", posOpen=") << posOpen
+           << DI::endl;
     return true;
 }
 
 void BlastGate::writeSettings() {
+    EEPROM.put(EEPROM_ADDR_INPUT_TH, inputThreshold);
+    EEPROM.put(EEPROM_ADDR_INPUT_HYST, inputHysteresis);
     EEPROM.put(EEPROM_ADDR_SPEED, moveSpeed);
-    EEPROM.put(EEPROM_ADDR_OPENPOS, openPos);
-    Serial << beginl << "Write EEPROM: speed=" << moveSpeed << ", openPos=" << openPos << DI::endl;
+    EEPROM.put(EEPROM_ADDR_POS_OPEN, posOpen);
+    Serial << beginl << F("Write EEPROM: inputTh=") << inputThreshold
+              << F(", inputHyst=") << inputHysteresis
+              << F(", speed=") << moveSpeed
+              << F(", posOpen=") << posOpen
+              << DI::endl;
 }
 
 // ---------------- State Machine ----------------
@@ -87,7 +115,7 @@ void BlastGate::update() {
         case STATE_CALIBRATION_START:
         case STATE_CALIBRATION_MOVE_TO_LIMIT:
         case STATE_CALIBRATION_WAIT_TO_START:
-        case STATE_CALIBRATION_WAIT_RELEASE:
+        case STATE_CALIBRATION_MOVE_TO_OPEN:
         case STATE_CALIBRATION_DONE:
             handleCalibration();
             break;
@@ -99,7 +127,7 @@ void BlastGate::update() {
 
 // ---------------- Homing ----------------
 void BlastGate::startHoming() {
-    Serial << beginl << yellow << "Starting homing..." << DI::endl;
+    Serial << beginl << yellow << F("Starting homing...") << DI::endl;
     state = STATE_HOMING_START;
     startTime = millis();
 }
@@ -112,21 +140,21 @@ void BlastGate::handleHoming() {
             stepper.moveTo(-POSITION_MAX); // move towards limit switch
             state = STATE_HOMING_MOVING;
             led.setState(LEDControl::LED_FLASH_SLOW);
-            Serial << beginl << blue << "Moving to limit switch..." << DI::endl;
+            Serial << beginl << blue << F("Moving to limit switch...") << DI::endl;
             break;
         case STATE_HOMING_MOVING:
             if (getLimitState()) {
                 stepper.stop();
-                stepper.setCurrentPosition(closedPos);
+                stepper.setCurrentPosition(posClosed);
                 state = STATE_HOMING_DONE;
             } else if (millis() - startTime > HOMING_TIMEOUT) {
-                Serial << beginl << red << "Homing timeout" << DI::endl;
+                Serial << beginl << red << F("Homing timeout") << DI::endl;
                 state = STATE_ERROR;
                 led.setState(LEDControl::LED_FLASH_FAST);
             }
             break;
         case STATE_HOMING_DONE:
-            Serial << beginl << green << "Homing done" << DI::endl;
+            Serial << beginl << green << F("Homing done") << DI::endl;
             led.setState(LEDControl::LED_OFF);
             state = STATE_MOVING;
             break;
@@ -138,7 +166,7 @@ void BlastGate::handleHoming() {
 
 // ---------------- Calibration ----------------
 void BlastGate::startCalibration() {
-    Serial << beginl << yellow << "Starting calibration..." << DI::endl;
+    Serial << beginl << yellow << F("Starting calibration...") << DI::endl;
     state = STATE_CALIBRATION_START;
     startTime = millis();
 }
@@ -147,12 +175,24 @@ void BlastGate::handleCalibration() {
 
     auto checkTimeout = [this]() {
         if (millis() - startTime > CALIBRATION_TIMEOUT) {
-            Serial << beginl << red << "Calibration timeout" << DI::endl;
+            Serial << beginl << red << F("Calibration timeout") << DI::endl;
             stepper.stop();
             state = STATE_ERROR;
             led.setState(LEDControl::LED_FLASH_FAST);
         }
     };
+
+    auto readInput = [this](bool open) {
+        if (millis() % 100 == 0) {
+            cli();  // thd is updated with adc value in interrupt context
+            auto val = thd.getValue();
+            sei();
+            if (open) adcOpen = val;
+            else adcClosed = val;
+            Serial << clearLine << beginl << F("inputVal(") << (open ? F("open") : F("closed")) << F(")=") << val << DI::endl;
+        }
+    };
+
     switch (state) {
         case STATE_CALIBRATION_START:
             stepper.setMaxSpeed(moveSpeed / 2);
@@ -160,13 +200,13 @@ void BlastGate::handleCalibration() {
             stepper.moveTo(-POSITION_MAX);
             state = STATE_CALIBRATION_MOVE_TO_LIMIT;
             led.setState(LEDControl::LED_FLASH_SLOW);
-            Serial << beginl << blue << "Moving to limit switch..." << DI::endl;
+                Serial << beginl << blue << F("Moving to limit switch...") << DI::endl;
             break;
         case STATE_CALIBRATION_MOVE_TO_LIMIT:
             if (getLimitState()) {
                 stepper.stop();
-                stepper.setCurrentPosition(closedPos);
-                Serial << beginl << blue << "Limit reached, press button to start" << DI::endl;
+                stepper.setCurrentPosition(posClosed);
+                Serial << beginl << blue << F("Limit reached, apply 'closed-position' supply voltage and press button to start") << DI::endl << DI::endl;
                 state = STATE_CALIBRATION_WAIT_TO_START;
             } else {
                 checkTimeout();
@@ -174,29 +214,44 @@ void BlastGate::handleCalibration() {
             break;
         case STATE_CALIBRATION_WAIT_TO_START:
             if (buttonPressedShort()) {
-                Serial << beginl << blue << "Press button when required open position is reached" << DI::endl;
+                Serial << beginl << blue << F("Press button when required open position is reached") << DI::endl << DI::endl;
                 stepper.moveTo(POSITION_MAX);
-                state = STATE_CALIBRATION_WAIT_RELEASE;
+                state = STATE_CALIBRATION_MOVE_TO_OPEN;
             } else {
                 checkTimeout();
+                readInput(false); 
             }
             break;
-        case STATE_CALIBRATION_WAIT_RELEASE:
+        case STATE_CALIBRATION_MOVE_TO_OPEN:
             if (buttonPressedShort()) {
                 stepper.stop();
-                openPos = stepper.currentPosition();
-                writeSettings();
-                Serial << beginl << green << "Calibration done, openPos=" << openPos << DI::endl;
+                posOpen = stepper.currentPosition();
+                Serial << beginl << blue << F("Apply 'open-position' supply voltage and press button to finish calibration") << DI::endl << DI::endl;
                 state = STATE_CALIBRATION_DONE;
             } else {
                 checkTimeout();
                 if (millis() % 100 == 0)
-                    Serial << clearLine << beginl << "openPos=" << stepper.currentPosition() << DI::endl;
+                    Serial << clearLine << beginl << F("posOpen=") << stepper.currentPosition() << DI::endl;
             }
             break;
         case STATE_CALIBRATION_DONE:
-            led.setState(LEDControl::LED_OFF);
-            state = STATE_MOVING;
+            if (buttonPressedShort()) {
+                if (isNear(adcClosed, adcOpen, 50)) {
+                    Serial << beginl << cyan << F("ADC values for open and closed positions are too close,") << DI::endl;
+                    Serial << beginl << cyan << F("omit threshold and hysteresis update") << DI::endl;
+                } else {
+                    Serial << beginl << cyan << F("update input threshold: ") << inputThreshold << F(" and hysteresis: ") << inputHysteresis << DI::endl;
+                    inputThreshold = (adcClosed + adcOpen) / 2;
+                    inputHysteresis = abs(adcClosed - adcOpen) / 2;
+                }
+                writeSettings();
+                Serial << beginl << green << F("Calibration done") << DI::endl;
+                led.setState(LEDControl::LED_OFF);
+                state = STATE_MOVING;
+            } else {
+                checkTimeout();
+                readInput(true);
+            }
             break;
         default:
             break;
@@ -209,12 +264,12 @@ void BlastGate::handleOperation() {
     if (input != inputState) {
         inputState = input;
         if (input) {
-            Serial << beginl << blue << "Input active, moving to open position..." << DI::endl;
-            stepper.moveTo(openPos);
+            Serial << beginl << blue << F("Input active, moving to open position...") << DI::endl;
+            stepper.moveTo(posOpen);
             led.setState(LEDControl::LED_ON);
         } else {
-            Serial << beginl << blue << "Input inactive, moving to closed position..." << DI::endl;
-            stepper.moveTo(closedPos);
+            Serial << beginl << blue << F("Input inactive, moving to closed position...") << DI::endl;
+            stepper.moveTo(posClosed);
             led.setState(LEDControl::LED_OFF);
         }
         state = STATE_MOVING;
@@ -222,17 +277,17 @@ void BlastGate::handleOperation() {
     }
 
     if ((state == STATE_MOVING) && (stepper.distanceToGo() == 0)) {
-        bool closed = (stepper.targetPosition() == closedPos);
+        bool closed = (stepper.targetPosition() == posClosed);
         if (closed) {
             // sanity check: limit switch must be active in closed position
             if (!getLimitState()) {
-                Serial << beginl << red << "Error: Limit switch not active in closed position" << DI::endl;
+                Serial << beginl << red << F("Error: Limit switch not active in closed position") << DI::endl;
                 state = STATE_ERROR;
                 led.setState(LEDControl::LED_FLASH_FAST);
                 return;
             }
         }
-        Serial << beginl << yellow << "Gate is now " << (closed ? "closed" : "open") << DI::endl;
+        Serial << beginl << yellow << F("Gate is now ") << (closed ? F("closed") : F("open")) << DI::endl;
         led.setState((closed) ? LEDControl::LED_OFF : LEDControl::LED_ON);
         state = STATE_IDLE;
     }
@@ -258,16 +313,16 @@ bool BlastGate::setSpeed(int32_t speed) {
     moveAcceleration = speed * 2;
     stepper.setMaxSpeed(moveSpeed);
     stepper.setAcceleration(moveAcceleration);
-    Serial << beginl << "Speed set to " << moveSpeed << ", acceleration set to " << moveAcceleration << DI::endl;
+    Serial << beginl << F("Speed set to ") << moveSpeed << F(", acceleration set to ") << moveAcceleration << DI::endl;
     return clamped;
 }
 
 void BlastGate::enterSpeedAdjustment() {
-    Serial << beginl << yellow << "Entering speed adjustment..." << DI::endl;
-    Serial << beginl << "Press button to modify speed, long press to exit" << DI::endl;
+    Serial << beginl << yellow << F("Entering speed adjustment...") << DI::endl;
+    Serial << beginl << F("Press button to modify speed, long press to exit") << DI::endl;
     stepper.setMaxSpeed(moveSpeed);
     stepper.setAcceleration(moveAcceleration);
-    stepper.moveTo(openPos);
+    stepper.moveTo(posOpen);
     led.setState(LEDControl::LED_FLASH_SLOW);
     state = STATE_SPEED_ADJUSTMENT;
     startTime = millis();
@@ -276,10 +331,10 @@ void BlastGate::enterSpeedAdjustment() {
 void BlastGate::handleSpeedAdjustment() {
     // bounce between open/closed
     if (stepper.distanceToGo() == 0) {
-        if (stepper.currentPosition() == openPos)
-            stepper.moveTo(closedPos);
+        if (stepper.currentPosition() == posOpen)
+            stepper.moveTo(posClosed);
         else
-            stepper.moveTo(openPos);
+            stepper.moveTo(posOpen);
     }
 
     // short press -> change speed
@@ -307,7 +362,7 @@ void BlastGate::handleSpeedAdjustment() {
     if (buttonPressedLong() || timeout) {
         writeSettings();
         led.indicate(5);
-        Serial << beginl << green << "Exit speed adjustment" << DI::endl;
+    Serial << beginl << green << F("Exit speed adjustment") << DI::endl;
         state = STATE_IDLE;
         inputState = -1; // trigger move to input defined position
     }
