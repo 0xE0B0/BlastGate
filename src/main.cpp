@@ -4,14 +4,15 @@
 // pin mapping
 constexpr uint8_t STEP_PIN          = 2;
 constexpr uint8_t DIR_PIN           = 3;
+constexpr uint8_t ENA_PIN           = 4;
 constexpr uint8_t LIMIT_SWITCH_PIN  = 6;
 constexpr uint8_t CMD_BUTTON_PIN    = 7;
-constexpr uint8_t LED_PIN           = LED_BUILTIN;
+constexpr uint8_t LED_PIN           = 8;
 constexpr uint8_t CMD_INPUT_PIN     = A0;
 
 static_assert(CMD_INPUT_PIN >= A0 && CMD_INPUT_PIN <= A5, "CMD_INPUT_PIN must be an analog pin (A0-A5) on Uno/Nano.");
 
-BlastGate gate(STEP_PIN, DIR_PIN, LIMIT_SWITCH_PIN, CMD_INPUT_PIN, CMD_BUTTON_PIN, LED_PIN);
+BlastGate gate(STEP_PIN, DIR_PIN, ENA_PIN, LIMIT_SWITCH_PIN, CMD_INPUT_PIN, CMD_BUTTON_PIN, LED_PIN);
 
 // timer1 interrupt handler for 10ms intervals
 #if defined(TIMER1_COMPA_vect)

@@ -9,7 +9,7 @@
 
 class BlastGate {
 public:
-    BlastGate(uint8_t stepPin, uint8_t dirPin, uint8_t limitPin, uint8_t inputPin, uint8_t buttonPin, uint8_t ledPin);
+    BlastGate(uint8_t stepPin, uint8_t dirPin, uint8_t enaPin, uint8_t limitPin, uint8_t inputPin, uint8_t buttonPin, uint8_t ledPin);
 
     void begin();
     void update();
@@ -42,10 +42,11 @@ private:
     static constexpr uint16_t CMD_INPUT_HYSTERESIS = 50;
 
     // motion parameters
+    // for microstep x2 and 200 steps/rev stepper motor
     static constexpr int32_t POSITION_MAX = 100000;
-    static constexpr int32_t SPEED_MAX = 1000;
-    static constexpr int32_t SPEED_MIN = 100;
-    static constexpr int32_t SPEED_INC = 10;
+    static constexpr int32_t SPEED_MAX = 2000;
+    static constexpr int32_t SPEED_MIN = 200;
+    static constexpr int32_t SPEED_INC = 50;
     static constexpr uint32_t HOMING_TIMEOUT = 5000; // ms
     static constexpr uint32_t CALIBRATION_TIMEOUT = 30000; // ms
 
@@ -65,6 +66,7 @@ private:
     int32_t moveAcceleration = SPEED_MIN*2;
     bool speedDirUp = true;
     int8_t inputState = -1; // -1 = unknown, 0 = closed, 1 = open
+    bool inputInverted = false;  // false: high voltage means open position, true: low voltage means open position
     int16_t inputThreshold = CMD_INPUT_THRESHOLD;
     int16_t inputHysteresis = CMD_INPUT_HYSTERESIS;
     uint16_t adcOpen = 0;

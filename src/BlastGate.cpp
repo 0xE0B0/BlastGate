@@ -6,9 +6,9 @@ static inline Print& beginl(Print &stream) {
     return beginl<name>(stream);
 }
 
-BlastGate::BlastGate(uint8_t stepPin, uint8_t dirPin, uint8_t limitPin,
+BlastGate::BlastGate(uint8_t stepPin, uint8_t dirPin, uint8_t enaPin, uint8_t limitPin,
                      uint8_t inputPin, uint8_t buttonPin, uint8_t ledPin)
-    : stepper(AccelStepper::DRIVER, stepPin, dirPin),
+    : stepper(AccelStepper::DRIVER, stepPin, dirPin, enaPin),
       led(ledPin),
       limitPin(limitPin), inputPin(inputPin), buttonPin(buttonPin) {}
 
@@ -44,11 +44,14 @@ void BlastGate::begin() {
 bool BlastGate::readSettings() {
     int32_t inputTh = 0;
     EEPROM.get(EEPROM_ADDR_INPUT_TH, inputTh);
-    if (inputTh < 0 || inputTh > 1020) {
+    if (inputTh < -1020 || inputTh > 1020) {
     Serial << beginl << blue << F("EEPROM invalid, using default input threshold") << DI::endl;
         inputThreshold = CMD_INPUT_THRESHOLD;
+        inputInverted = false;
     } else {
-        inputThreshold = inputTh;
+        // inversion is coded in the sign
+        inputThreshold = abs(inputTh);
+        inputInverted = (inputTh < 0);
     }
     int32_t inputHyst = 0;
     EEPROM.get(EEPROM_ADDR_INPUT_HYST, inputHyst);
@@ -83,7 +86,7 @@ bool BlastGate::readSettings() {
 }
 
 void BlastGate::writeSettings() {
-    EEPROM.put(EEPROM_ADDR_INPUT_TH, inputThreshold);
+    EEPROM.put(EEPROM_ADDR_INPUT_TH, (inputInverted ? -inputThreshold : inputThreshold));
     EEPROM.put(EEPROM_ADDR_INPUT_HYST, inputHysteresis);
     EEPROM.put(EEPROM_ADDR_SPEED, moveSpeed);
     EEPROM.put(EEPROM_ADDR_POS_OPEN, posOpen);
@@ -240,9 +243,11 @@ void BlastGate::handleCalibration() {
                     Serial << beginl << cyan << F("ADC values for open and closed positions are too close,") << DI::endl;
                     Serial << beginl << cyan << F("omit threshold and hysteresis update") << DI::endl;
                 } else {
-                    Serial << beginl << cyan << F("update input threshold: ") << inputThreshold << F(" and hysteresis: ") << inputHysteresis << DI::endl;
                     inputThreshold = (adcClosed + adcOpen) / 2;
+                    inputInverted = (adcClosed > adcOpen);
                     inputHysteresis = abs(adcClosed - adcOpen) / 2;
+                    Serial << beginl << cyan << F("update input threshold: ") << inputThreshold << F(", inversion: ") <<
+                        (inputInverted ? F("enabled") : F("disabled")) << F(", hysteresis: ") << inputHysteresis << DI::endl;
                 }
                 writeSettings();
                 Serial << beginl << green << F("Calibration done") << DI::endl;
@@ -260,7 +265,7 @@ void BlastGate::handleCalibration() {
 
 // ---------------- Normal Operation ----------------
 void BlastGate::handleOperation() {
-    int8_t input = getInputState() ? 1 : 0;
+    int8_t input = (getInputState() ^ inputInverted) ? 1 : 0;
     if (input != inputState) {
         inputState = input;
         if (input) {
@@ -269,6 +274,21 @@ void BlastGate::handleOperation() {
             led.setState(LEDControl::LED_ON);
         } else {
             Serial << beginl << blue << F("Input inactive, moving to closed position...") << DI::endl;
+            stepper.moveTo(posClosed);
+            led.setState(LEDControl::LED_OFF);
+        }
+        state = STATE_MOVING;
+        led.setState(LEDControl::LED_FLASH_SLOW);
+    }
+
+    // short button press -> toggle position
+    if (buttonPressedShort()) {
+        if (stepper.targetPosition() == posClosed) {
+            Serial << beginl << blue << F("Command button pressed, moving to open position...") << DI::endl;
+            stepper.moveTo(posOpen);
+            led.setState(LEDControl::LED_ON);
+        } else {
+            Serial << beginl << blue << F("Command button pressed, moving to closed position...") << DI::endl;
             stepper.moveTo(posClosed);
             led.setState(LEDControl::LED_OFF);
         }
