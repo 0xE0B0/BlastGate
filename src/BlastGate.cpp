@@ -277,6 +277,8 @@ void BlastGate::handleOperation() {
     int8_t input = (getInputState() ^ inputInverted) ? 1 : 0;
     if (input != inputState) {
         inputState = input;
+        stepper.setMaxSpeed(moveSpeed);
+        stepper.setAcceleration(moveAcceleration);
         if (input) {
             Serial << beginl << blue << F("Input active, moving to open position...") << DI::endl;
             stepper.moveTo(posOpen);
@@ -292,6 +294,8 @@ void BlastGate::handleOperation() {
 
     // short button press -> toggle position
     if (buttonPressedShort()) {
+        stepper.setMaxSpeed(moveSpeed);
+        stepper.setAcceleration(moveAcceleration);
         if (stepper.targetPosition() == posClosed) {
             Serial << beginl << blue << F("Command button pressed, moving to open position...") << DI::endl;
             stepper.moveTo(posOpen);
