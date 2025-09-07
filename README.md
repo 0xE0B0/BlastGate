@@ -47,11 +47,18 @@ Pins are defined in `main.cpp`:
   the gate enters an error state indicated by a fast flashing LED. The error state can only be exited by a power cycle.
 2. When the analog input crosses the configured threshold (with hysteresis), the gate opens or closes automatically. Low (default) commands gate closed, high commands gate open. The limit switch defines the mechanical end position and is used for homing and calibration. The status LED shows the current state (gate closed: LED off, gate opened: LED on). While moving to a new position the status LED flashes slowly.
 As a sanity check, the limit switch is expected to be activated in closed position. If it is not, an error is indicated by fast flashing of the status LED. The error state can only be cleared by a power cycle.
-
+3. Pressing the command button can be used to override the actual input level defined position. Each single press toggles the current position. This can be used for manual operation.
+4. Long press of the command button enters the speed adjustment mode.
+   
 ## Button Control
 
-### Calibration
+### Position Commanding
+Command button short press toggles the open and closed position and therefore allows manual operation. The input level must change in order to return to the input level defined position.
 
+### Speed Adjustment
+Command button long press enters the speed adjustment mode. In this mode the gate moves constantly between the closed and the open position with the current speed. Short presses modifies the speed. A long press exits the adjustment mode and stores the current speed to EEPROM to be restored at startup.
+
+### Calibration
 If the button is pressed at start-up (or if no valid EEPROM settings can be loaded) the calibration routine is started. The intended flow is:
 
 - The gate moves toward the closed position until the limit switch is activated. At this point apply the "closed-position" supply voltage level (the voltage you want the system to treat as "closed") and press the button once - this records the closed-position ADC level.
@@ -61,12 +68,6 @@ If the button is pressed at start-up (or if no valid EEPROM settings can be load
 The firmware compares the recorded ADC levels for closed and open positions. If they are sufficiently separated the input threshold and hysteresis are updated and saved to EEPROM. If the two ADC readings are too close (within the safety margin) the threshold/hysteresis update is omitted to avoid ambiguous input detection.
 
 If no button press is detected for the configured calibration timeout the gate enters an error state indicated by a fast flashing LED. The error state can only be cleared by a power cycle.
-
-### Position Commanding
-Button short press toggles the open and closed position and therefore allows manual operation. The input level must change in order to return to the input level defined position.
- 
-### Speed Adjustment
-Button long press enters the speed adjustment mode. In this mode the gate moves constantly between the closed and the open position with the current speed. Short presses modifies the speed. A long press exits the adjustment mode and stores the current speed to EEPROM to be restored at startup.
 
 ## Build & Upload (VS Code + PlatformIO on Windows PowerShell)
 1. Install VS Code and the PlatformIO IDE extension.

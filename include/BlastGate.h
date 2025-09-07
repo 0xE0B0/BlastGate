@@ -41,6 +41,9 @@ private:
     static constexpr uint16_t CMD_INPUT_THRESHOLD = 860; 
     static constexpr uint16_t CMD_INPUT_HYSTERESIS = 50;
 
+    static constexpr uint16_t ADC_MIN = 0;
+    static constexpr uint16_t ADC_MAX = 1023;
+
     // motion parameters
     // for microstep x2 and 200 steps/rev stepper motor
     static constexpr int32_t POSITION_MAX = 100000;

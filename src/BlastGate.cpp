@@ -44,8 +44,9 @@ void BlastGate::begin() {
 bool BlastGate::readSettings() {
     int32_t inputTh = 0;
     EEPROM.get(EEPROM_ADDR_INPUT_TH, inputTh);
-    if (inputTh < -1020 || inputTh > 1020) {
-    Serial << beginl << blue << F("EEPROM invalid, using default input threshold") << DI::endl;
+    if (inputTh < -int32_t(ADC_MAX) || inputTh > int32_t(ADC_MAX)) {
+        Serial << beginl << "inputTh=" << inputTh << DI::endl;
+        Serial << beginl << blue << F("EEPROM invalid, using default input threshold") << DI::endl;
         inputThreshold = CMD_INPUT_THRESHOLD;
         inputInverted = false;
     } else {
@@ -55,7 +56,8 @@ bool BlastGate::readSettings() {
     }
     int32_t inputHyst = 0;
     EEPROM.get(EEPROM_ADDR_INPUT_HYST, inputHyst);
-    if (inputHyst < 0 || inputHyst > 300) {
+    if (inputHyst < 0 || inputHyst > ADC_MAX / 4) {
+        Serial << beginl << "inputHyst=" << inputHyst << DI::endl;
         Serial << beginl << blue << F("EEPROM invalid, using default input hysteresis") << DI::endl;
         inputHysteresis = CMD_INPUT_HYSTERESIS;
     } else {
@@ -86,10 +88,10 @@ bool BlastGate::readSettings() {
 }
 
 void BlastGate::writeSettings() {
-    EEPROM.put(EEPROM_ADDR_INPUT_TH, (inputInverted ? -inputThreshold : inputThreshold));
-    EEPROM.put(EEPROM_ADDR_INPUT_HYST, inputHysteresis);
-    EEPROM.put(EEPROM_ADDR_SPEED, moveSpeed);
-    EEPROM.put(EEPROM_ADDR_POS_OPEN, posOpen);
+    EEPROM.put(EEPROM_ADDR_INPUT_TH, (inputInverted ? -int32_t(inputThreshold) : int32_t(inputThreshold)));
+    EEPROM.put(EEPROM_ADDR_INPUT_HYST, int32_t(inputHysteresis));
+    EEPROM.put(EEPROM_ADDR_SPEED, int32_t(moveSpeed));
+    EEPROM.put(EEPROM_ADDR_POS_OPEN, int32_t(posOpen));
     Serial << beginl << F("Write EEPROM: inputTh=") << inputThreshold
               << F(", inputHyst=") << inputHysteresis
               << F(", speed=") << moveSpeed
@@ -152,6 +154,7 @@ void BlastGate::handleHoming() {
                 state = STATE_HOMING_DONE;
             } else if (millis() - startTime > HOMING_TIMEOUT) {
                 Serial << beginl << red << F("Homing timeout") << DI::endl;
+                stepper.stop();
                 state = STATE_ERROR;
                 led.setState(LEDControl::LED_FLASH_FAST);
             }
@@ -239,13 +242,19 @@ void BlastGate::handleCalibration() {
             break;
         case STATE_CALIBRATION_DONE:
             if (buttonPressedShort()) {
-                if (isNear(adcClosed, adcOpen, 50)) {
+                if (isNear(adcClosed, adcOpen, CMD_INPUT_HYSTERESIS)) {
                     Serial << beginl << cyan << F("ADC values for open and closed positions are too close,") << DI::endl;
                     Serial << beginl << cyan << F("omit threshold and hysteresis update") << DI::endl;
                 } else {
-                    inputThreshold = (adcClosed + adcOpen) / 2;
                     inputInverted = (adcClosed > adcOpen);
-                    inputHysteresis = abs(adcClosed - adcOpen) / 2;
+                    if (inputInverted) {
+                        inputThreshold = ((adcClosed - adcOpen) / 2) + adcOpen;
+                        inputHysteresis = (adcClosed - adcOpen) / 4;
+                    } else {
+                        inputThreshold = ((adcOpen - adcClosed) / 2) + adcClosed;
+                        inputHysteresis = (adcOpen - adcClosed) / 4;
+                    }
+                    if (inputHysteresis < int16_t(CMD_INPUT_HYSTERESIS)) inputHysteresis = int16_t(CMD_INPUT_HYSTERESIS);
                     Serial << beginl << cyan << F("update input threshold: ") << inputThreshold << F(", inversion: ") <<
                         (inputInverted ? F("enabled") : F("disabled")) << F(", hysteresis: ") << inputHysteresis << DI::endl;
                 }
