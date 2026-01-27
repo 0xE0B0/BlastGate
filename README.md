@@ -1,4 +1,4 @@
-# Cust Collector Blast Gate
+## Dust Collector Blast Gate
 
 BlastGate is a Arduino/PlatformIO project that controls a stepper-driven gate intended for an airflow shutter of a dust collection system. A homing routine moves the gate to the closed position at start up using a physical limit switch. The open position and move speed can be teached in with a calibration and speed adjustment routine.
 
@@ -45,7 +45,7 @@ Pins are defined in `main.cpp`:
     - 18 V -> Vout = 0,9310 V -> ADC = 866
     - 19 V -> Vout = 0,9827 V -> ADC = 914
 
-- The default tThreshold and hysteresis may be configured to `CMD_INPUT_THRESHOLD` and `CMD_INPUT_HYSTERESIS`.
+- The default threshold and hysteresis may be configured to `CMD_INPUT_THRESHOLD` and `CMD_INPUT_HYSTERESIS`.
 
 ## Behavior
 
