@@ -5,19 +5,17 @@
 #include "DebugInterface.h"
 #include "Debounce.h"
 #include "ThresholdDetector.h"
-#include "version.h"
 
 class BlastGate {
 public:
     BlastGate(uint8_t stepPin, uint8_t dirPin, uint8_t enaPin, uint8_t limitPin, uint8_t inputPin, uint8_t buttonPin, uint8_t ledPin);
 
-    void begin();
-    void update();
+    void init();
+    void loop();
 
     void debounce() {
         thd.setValue(analogRead(inputPin));
-        auto input = (((digitalRead(limitPin)  == HIGH) ? LIMIT_SWITCH : 0) |  // high active limit switch
-                      ((digitalRead(buttonPin) == LOW)  ? CMD_BUTTON   : 0) |  // low active button
+        auto input = (((digitalRead(buttonPin) == LOW)  ? CMD_BUTTON   : 0) |  // low active button
                       (thd.isOver() ? CMD_INPUT : 0));  // analog input via threshold detector
         deb.tick(input);
     }
@@ -25,9 +23,8 @@ public:
 private:
 
     // pin identifiers
-    static constexpr uint8_t LIMIT_SWITCH = 1;
-    static constexpr uint8_t CMD_INPUT = 2;
-    static constexpr uint8_t CMD_BUTTON = 4;
+    static constexpr uint8_t CMD_INPUT = 1;
+    static constexpr uint8_t CMD_BUTTON = 2;
 
     // command input monitors the power supply voltage
     // - a low (default) supply voltage commands the gate into closed position
@@ -121,7 +118,7 @@ private:
         return setSpeed(moveSpeed + inc);
     }
 
-    inline bool getLimitState() { return deb.getKeyState(LIMIT_SWITCH); }
+    inline bool getLimitState() { return (digitalRead(limitPin) == HIGH); }
     inline bool getInputState() { return deb.getKeyState(CMD_INPUT); }
     inline bool getButtonState() { return deb.getKeyState(CMD_BUTTON); }
     inline bool buttonPressedShort() { return deb.getKeyShort(CMD_BUTTON); }

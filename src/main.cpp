@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "BlastGate.h"
+#include "version.h"
 
 // pin mapping
 constexpr uint8_t STEP_PIN          = 2;
@@ -52,10 +53,15 @@ void initTimer1_10ms() {
 
 void setup() {
     initTimer1_10ms();
+
     Serial.begin(debugBaudRate);
-    gate.begin();
+    Serial << magenta << F("BlastGate v");
+    Serial << magenta << BG_VERSION_MAJOR << F(".") << BG_VERSION_MINOR << F(".") << BG_VERSION_SUB;
+    Serial << magenta << F(" (") <<  __TIMESTAMP__  << F(")") << DI::endl;
+
+    gate.init();
 }
 
 void loop() {
-    gate.update();
+    gate.loop();
 }

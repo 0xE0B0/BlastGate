@@ -12,10 +12,7 @@ BlastGate::BlastGate(uint8_t stepPin, uint8_t dirPin, uint8_t enaPin, uint8_t li
       led(ledPin),
       limitPin(limitPin), inputPin(inputPin), buttonPin(buttonPin) {}
 
-void BlastGate::begin() {
-    Serial << magenta << F("BlastGate v");
-    Serial << magenta << BG_VERSION_MAJOR << F(".") << BG_VERSION_MINOR << F(".") << BG_VERSION_SUB;
-    Serial << magenta << F(" (") <<  __TIMESTAMP__  << F(")") << DI::endl;
+void BlastGate::init() {
 
     pinMode(inputPin, INPUT);
     analogReference(INTERNAL); // use internal 1.1V reference for analog input
@@ -100,7 +97,7 @@ void BlastGate::writeSettings() {
 }
 
 // ---------------- State Machine ----------------
-void BlastGate::update() {
+void BlastGate::loop() {
     stepper.run();
     led.update();
 
