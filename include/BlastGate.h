@@ -15,7 +15,7 @@ public:
 
     void debounce() {
         thd.setValue(analogRead(inputPin));
-        auto input = (((digitalRead(buttonPin) == LOW)  ? CMD_BUTTON   : 0) |  // low active button
+        auto input = (((digitalRead(buttonPin) == LOW) ? CMD_BUTTON : 0) |  // low active button
                       (thd.isOver() ? CMD_INPUT : 0));  // analog input via threshold detector
         deb.tick(input);
     }
@@ -118,13 +118,25 @@ private:
         return setSpeed(moveSpeed + inc);
     }
 
-    inline bool getLimitState() { return (digitalRead(limitPin) == HIGH); }
+    bool getLimitState() {
+        // short debounce of limit switch
+        bool active = true;
+        for (uint8_t i = 0; i < 3; i++) {
+            if (digitalRead(limitPin) == HIGH) {
+                active = false;
+                break;
+            }
+            delay(1);
+        }
+        return active;
+    };
+        
     inline bool getInputState() { return deb.getKeyState(CMD_INPUT); }
     inline bool getButtonState() { return deb.getKeyState(CMD_BUTTON); }
     inline bool buttonPressedShort() { return deb.getKeyShort(CMD_BUTTON); }
     inline bool buttonPressedLong() { return deb.getKeyLong(CMD_BUTTON); }
 
     inline bool isNear(uint16_t a, uint16_t b, uint16_t threshold) {
-    return (abs((int32_t)a - (int32_t)b) <= threshold);
+        return (abs((int32_t)a - (int32_t)b) <= threshold);
     }
 };
