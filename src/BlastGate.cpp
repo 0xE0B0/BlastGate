@@ -279,11 +279,9 @@ void BlastGate::handleOperation() {
         if (input) {
             Serial << beginl << blue << F("Input active, moving to open position...") << DI::endl;
             stepper.moveTo(posOpen);
-            led.setState(LEDControl::LED_ON);
         } else {
             Serial << beginl << blue << F("Input inactive, moving to closed position...") << DI::endl;
             stepper.moveTo(posClosed);
-            led.setState(LEDControl::LED_OFF);
         }
         state = STATE_MOVING;
         led.setState(LEDControl::LED_FLASH_SLOW);
@@ -296,11 +294,9 @@ void BlastGate::handleOperation() {
         if (stepper.targetPosition() == posClosed) {
             Serial << beginl << blue << F("Command button pressed, moving to open position...") << DI::endl;
             stepper.moveTo(posOpen);
-            led.setState(LEDControl::LED_ON);
         } else {
             Serial << beginl << blue << F("Command button pressed, moving to closed position...") << DI::endl;
             stepper.moveTo(posClosed);
-            led.setState(LEDControl::LED_OFF);
         }
         state = STATE_MOVING;
         led.setState(LEDControl::LED_FLASH_SLOW);
